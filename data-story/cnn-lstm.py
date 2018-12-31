@@ -49,43 +49,6 @@ NUM_EPOCHS = None                  # Number of epochs to train a model for
 label2emotion = {0:"others", 1:"happy", 2: "sad", 3:"angry"}
 emotion2label = {"others":0, "happy":1, "sad":2, "angry":3}
 
-
-def decontracted(phrase):
-    # specific
-    phrase = re.sub(r"won't", "will not", phrase)
-    phrase = re.sub(r"can\'t", "can not", phrase)
-    phrase = re.sub(r"won’t", "will not", phrase)
-    phrase = re.sub(r"can\’t", "can not", phrase)
-    # general
-    phrase = re.sub(r"n\'t", " not", phrase)
-    phrase = re.sub(r"\'re", " are", phrase)
-    phrase = re.sub(r"\'s", " is", phrase)
-    phrase = re.sub(r"\'d", " would", phrase)
-    phrase = re.sub(r"\'ll", " will", phrase)
-    phrase = re.sub(r"\'l", " will", phrase)
-    phrase = re.sub(r"\'t", " not", phrase)
-    phrase = re.sub(r"\'ve", " have", phrase)
-    phrase = re.sub(r"\'m", " am", phrase)
-    phrase = re.sub(r"\'em", " them", phrase)
-    phrase = re.sub(r"\'nt", " not", phrase)
-    
-    phrase = re.sub(r"n\’t", " not", phrase)
-    phrase = re.sub(r"\’re", " are", phrase)
-    phrase = re.sub(r"\’s", " is", phrase)
-    phrase = re.sub(r"\’d", " would", phrase)
-    phrase = re.sub(r"\’ll", " will", phrase)
-    phrase = re.sub(r"\’l", " will", phrase)
-    phrase = re.sub(r"\’t", " not", phrase)
-    phrase = re.sub(r"\’ve", " have", phrase)
-    phrase = re.sub(r"\’m", " am", phrase)
-    phrase = re.sub(r"\’em", " them", phrase)
-    phrase = re.sub(r"\’nt", " not", phrase)
-    
-    return phrase
-
-
-label2emotion = {0:"others", 1:"happy", 2: "sad", 3:"angry"}
-emotion2label = {"others":0, "happy":1, "sad":2, "angry":3}
 def preprocessData(dataFilePath, mode):
     """Load data from a file, process and return indices, conversations and labels in separate lists
     Input:
@@ -97,98 +60,32 @@ def preprocessData(dataFilePath, mode):
         labels : [Only available in "train" mode] List of labels
     """
 
-    with open('../emoji/emoji_ranks.json', 'r') as fn:
-        e_data = json.load(fn)
-    
-    pos_emoticons = e_data['pos']
-    neg_emoticons = e_data['neg']
-    neutral_emoticons = e_data['neu']
-        
-    # Emails
-    emailsRegex=re.compile(r'[\w\.-]+@[\w\.-]+')
-
-    # Mentions
-    userMentionsRegex=re.compile(r'(?<=^|(?<=[^a-zA-Z0-9-_\.]))@([A-Za-z]+[A-Za-z0-9]+)')
-
-    #Urls
-    urlsRegex=re.compile(r'(f|ht)(tp)(s?)(://)(.*)[.|/][^ ]+') # It may not be handling all the cases like t.co without http
-
-    #Numerics
-    numsRegex=re.compile(r"\b\d+\b")
-
-    punctuationNotEmoticonsRegex=re.compile(r'([!?.,]){2,}')
-    
-    elongatedWords = re.compile(r'\b(\S*?)(.)\2{2,}\b')
-    allCaps = re.compile(r"((?![<]*}) [A-Z][A-Z]+)")
-
-    emoticonsDict = {}
-    for i,each in enumerate(pos_emoticons):
-        emoticonsDict[each]= ' <SMILE> '
-    for i,each in enumerate(neg_emoticons):
-        emoticonsDict[each]=' <SADFACE> '
-    for i,each in enumerate(neutral_emoticons):
-        emoticonsDict[each]=' <NEUTRALFACE> '
     # use these three lines to do the replacement
-    rep = dict((re.escape(k), v) for k, v in emoticonsDict.items())
-    emoticonsPattern = re.compile("|".join(rep.keys()))
-    indices = []
-    conversations = []
     labels = []
     u1 = []
     u2 = []
     u3 = []
     indices = []
-    
-    with io.open(dataFilePath, encoding="utf8") as finput:
-        finput.readline()
-        for row in finput:
-            # Convert multiple instances of . ? ! , to single instance
-            # okay...sure -> okay . sure
-            # okay???sure -> okay ? sure
-            # Add whitespace around such punctuation
-            # okay!sure -> okay ! sure
-#             repeatedChars = ['.', '?', '!', ',']
-            
-            items = row.strip('\n').split('\t')
-            line = '\t'.join(items[1:4])
-            line = emoticonsPattern.sub(lambda m: rep[re.escape(m.group(0))], line.strip())
-            line = userMentionsRegex.sub(' <USER> ', line )
-            line = emailsRegex.sub(' <EMAIL> ', line )
-            line = urlsRegex.sub(' <URL> ', line)
-            line = numsRegex.sub(' <NUMBER> ',line)
-            line = punctuationNotEmoticonsRegex.sub(r' \1 <REPEAT> ',line)
-            line = elongatedWords.sub(r'\1\2 <ELONG> ', line)
-            line = allCaps.sub(r'\1 <ALLCAPS> ', line)
-            line = re.sub('([.,!?])', r' \1 ', line)
-            line = re.sub(r"[-+]?[.\d]*[\d]+[:,.\d]*", r" <NUMBER> ", line)
-            line = re.sub(r'(.)\1{2,}', r'\1\1',line)
-            line = line.strip().split('\t')
-            line_0 = decontracted(line[0].lower())
-            line_1 = decontracted(line[1].lower())
-            line_2 = decontracted(line[2].lower())
-            
-            if mode == "train":
-                # Train data contains id, 3 turns and label
-                label = emotion2label[items[4]]
-                labels.append(label)
-            
-            conv = ' '.join(line)
-            
-            u1.append(line_0)
-            u2.append(line_1)
-            u3.append(line_2)
-            
-            # Remove any duplicate spaces
-            duplicateSpacePattern = re.compile(r'\ +')
-            conv = re.sub(duplicateSpacePattern, ' ', conv)
-            
-            indices.append(int(items[0]))
-            conversations.append(conv.lower())
-    
+    df = pd.read_csv(dataFilePath, sep='\t')
+
     if mode == "train":
-        return indices, conversations, labels, u1, u2, u3
+        indices = df.id.values
+        u1 = df.turn1.tolist()
+        u2 = df.turn2.tolist()
+        u3 = df.turn3.tolist()
+        emotion = df.label.tolist()
+        for l in emotion:
+            labels.append(emotion2label[l])
     else:
-        return indices, conversations, u1, u2, u3
+        indices = df.id.values
+        u1 = df.turn1.tolist()
+        u2 = df.turn2.tolist()
+        u3 = df.turn3.tolist()
+     
+    if mode == "train":
+        return indices, labels, u1, u2, u3
+    else:
+        return indices, u1, u2, u3
 
 
 def getMetrics(predictions, ground):
@@ -249,32 +146,6 @@ def getMetrics(predictions, ground):
     
     print("Accuracy : %.4f, Micro Precision : %.4f, Micro Recall : %.4f, Micro F1 : %.4f" % (accuracy, microPrecision, microRecall, microF1))
     return accuracy, microPrecision, microRecall, microF1
-
-
-def writeNormalisedData(dataFilePath, texts):
-    """Write normalised data to a file
-    Input:
-        dataFilePath : Path to original train/test file that has been processed
-        texts : List containing the normalised 3 turn conversations, separated by the <eos> tag.
-    """
-    normalisedDataFilePath = dataFilePath.replace(".txt", "_normalised.txt")
-    with io.open(normalisedDataFilePath, 'w', encoding='utf8') as fout:
-        with io.open(dataFilePath, encoding='utf8') as fin:
-            fin.readline()
-            for lineNum, line in enumerate(fin):
-                line = line.strip().split('\t')
-                normalisedLine = texts[lineNum].strip().split('<eos>')
-                fout.write(line[0] + '\t')
-                # Write the original turn, followed by the normalised version of the same turn
-                fout.write(line[1] + '\t' + normalisedLine[0] + '\t')
-                fout.write(line[2] + '\t' + normalisedLine[1] + '\t')
-                fout.write(line[3] + '\t' + normalisedLine[2] + '\t')
-                try:
-                    # If label information available (train time)
-                    fout.write(line[4] + '\n')    
-                except:
-                    # If label information not available (test time)
-                    fout.write('\n')
 
 
 def getEmbeddingMatrix(wordIndex, out_of_vocab):
@@ -461,23 +332,15 @@ def main():
     SINGLE_ATTENTION_VECTOR = False
     TIME_STEPS = 3
     print("Processing training data...")
-    trainIndices, trainTexts, labels, u1_train, u2_train, u3_train = preprocessData(trainDataPath, mode="train")
-    # Write normalised text to file to check if normalisation works. Disabled now. Uncomment following line to enable   
-    # writeNormalisedData(trainDataPath, trainTexts)
+    trainIndices, labels, u1_train, u2_train, u3_train = preprocessData(trainDataPath, mode="train")
     print("Processing val data...")
-    valIndices, valTexts, vallabels, u1_val, u2_val, u3_val = preprocessData(valDataPath, mode="train")
+    valIndices, vallabels, u1_val, u2_val, u3_val = preprocessData(valDataPath, mode="train")
     print("Processing test data...")
-    testIndices, testTexts, u1_test, u2_test, u3_test = preprocessData(testDataPath, mode="test")
-    # writeNormalisedData(testDataPath, testTexts)
+    testIndices, u1_test, u2_test, u3_test = preprocessData(testDataPath, mode="test")
 
-    print("Extracting tokens...")
-    from nltk.tokenize import TweetTokenizer
-    tokenizer = TweetTokenizer(preserve_case=True, reduce_len=True, strip_handles=False)
-    print("Extracting tokens...")
     vocab = []
     for sent in u1_train+u2_train+u3_train+u1_val+u2_val+u3_val+u1_test+u2_test+u3_test:
-        vocab.extend(tokenizer.tokenize(sent))
-
+        vocab.extend(sent.split(' '))
     wordIndex = {} 
     for i, word in enumerate(list(set(vocab))):
         wordIndex[word] = i+1
@@ -487,12 +350,13 @@ def main():
     out_of_vocab = []
     embeddingMatrix, _ = getEmbeddingMatrix(wordIndex, out_of_vocab)
 
-    u1_trainToken, u2_trainToken, u3_trainToken = [tokenizer.tokenize(x) for x in u1_train], [tokenizer.tokenize(x) for x in u2_train], [tokenizer.tokenize(x) for x in u3_train]
-    u1_valToken, u2_valToken, u3_valToken = [tokenizer.tokenize(x) for x in u1_val], [tokenizer.tokenize(x) for x in u2_val], [tokenizer.tokenize(x) for x in u3_val]
-    u1_testToken, u2_testToken, u3_testToken = [tokenizer.tokenize(x) for x in u1_test], [tokenizer.tokenize(x) for x in u2_test], [tokenizer.tokenize(x) for x in u3_test]
+    #u1_trainToken, u2_trainToken, u3_trainToken = [tokenizer.tokenize(x) for x in u1_train], [tokenizer.tokenize(x) for x in u2_train], [tokenizer.tokenize(x) for x in u3_train]
+    #u1_valToken, u2_valToken, u3_valToken = [tokenizer.tokenize(x) for x in u1_val], [tokenizer.tokenize(x) for x in u2_val], [tokenizer.tokenize(x) for x in u3_val]
+    #u1_testToken, u2_testToken, u3_testToken = [tokenizer.tokenize(x) for x in u1_test], [tokenizer.tokenize(x) for x in u2_test], [tokenizer.tokenize(x) for x in u3_test]
 
-    def text_to_seq(wordIndex, tokens):
+    def text_to_seq(wordIndex, sent):
         seq = []
+        tokens = sent.split(' ')
         for w in tokens:
             seq.append(wordIndex[w])
             #if w in wordIndex:
@@ -502,9 +366,9 @@ def main():
             #    seq.append(wordIndex[w])
         return seq
 
-    u1_trainSequences, u2_trainSequences, u3_trainSequences = [text_to_seq(wordIndex, x) for x in u1_trainToken], [text_to_seq(wordIndex, x) for x in u2_trainToken], [text_to_seq(wordIndex, x) for x in u3_trainToken]
-    u1_valSequences, u2_valSequences, u3_valSequences = [text_to_seq(wordIndex, x) for x in u1_valToken], [text_to_seq(wordIndex, x) for x in u2_valToken], [text_to_seq(wordIndex, x) for x in u3_valToken]
-    u1_testSequences, u2_testSequences, u3_testSequences = [text_to_seq(wordIndex, x) for x in u1_testToken], [text_to_seq(wordIndex, x) for x in u2_testToken], [text_to_seq(wordIndex, x) for x in u3_testToken]
+    u1_trainSequences, u2_trainSequences, u3_trainSequences = [text_to_seq(wordIndex, x) for x in u1_train], [text_to_seq(wordIndex, x) for x in u2_train], [text_to_seq(wordIndex, x) for x in u3_train]
+    u1_valSequences, u2_valSequences, u3_valSequences = [text_to_seq(wordIndex, x) for x in u1_val], [text_to_seq(wordIndex, x) for x in u2_val], [text_to_seq(wordIndex, x) for x in u3_val]
+    u1_testSequences, u2_testSequences, u3_testSequences = [text_to_seq(wordIndex, x) for x in u1_test], [text_to_seq(wordIndex, x) for x in u2_test], [text_to_seq(wordIndex, x) for x in u3_test]
 
     print("Found %s unique tokens." % len(wordIndex))
     print("Populating embedding matrix...")
@@ -547,7 +411,7 @@ def main():
     print("Starting k-fold cross validation...")
     print('-'*40)
     print("Building model...")
-    '''
+    
     model = buildModel(embeddingMatrix)
     #model.load_weights('EP5_LR200e-5_LDim200_BS200_weights.h5')
     model.fit([u1_data,u2_data,u3_data], labels, 
@@ -561,7 +425,7 @@ def main():
     target_names = ["others", "happy", "sad", "angry"]
     from sklearn.metrics import classification_report
     print(classification_report(y_true, y_pred, target_names=target_names))
-    '''
+    
     #accuracy, microPrecision, microRecall, microF1 = getMetrics(predictions, yVal)
     #metrics["accuracy"].append(accuracy)
     #metrics["microPrecision"].append(microPrecision)
